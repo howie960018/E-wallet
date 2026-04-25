@@ -1,5 +1,6 @@
 package com.example.wallet.service;
-
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
 import com.example.wallet.common.result.BizException;
 import com.example.wallet.common.result.ResultCode;
 import com.example.wallet.domain.bo.AccountBO;
@@ -44,6 +45,13 @@ class UserBalanceServiceTest {
 
     @InjectMocks
     private UserBalanceServiceImpl userBalanceService;
+
+    @BeforeEach
+    void setup() {
+        // By default, simulate successful optimistic-lock update (1 row affected)
+        lenient().when(userBalanceManager.updateBalance(any(UserBalancePO.class), any()))
+                .thenReturn(1);
+    }
 
     // ===================== 共用測試資料 =====================
 
@@ -143,7 +151,7 @@ class UserBalanceServiceTest {
 
             userBalanceService.charge(dto);
 
-            verify(userBalanceManager).updateBalance(1L, 15000L);
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 1L), eq(15000L));
             verify(userBalanceManager).saveFlow(any());
             verify(userBalanceManager).updateOrderStatus("ORDER_001", "2", "PAY_888");
         }
@@ -182,6 +190,35 @@ class UserBalanceServiceTest {
                             ((BizException) e).getResultCode())
                             .isEqualTo(ResultCode.ACCOUNT_NOT_EXIST));
         }
+
+
+        @Test
+        @DisplayName("樂觀鎖衝突 - 應拋出 OPTIMISTIC_LOCK_CONFLICT 例外")
+        void charge_optimisticLockConflict() {
+            BalanceChargeDTO dto = new BalanceChargeDTO();
+            dto.setUserId("user_001");
+            dto.setOrderId("ORDER_001");
+            dto.setAmount(5000L);
+            dto.setTradeNo("PAY_888");
+
+            when(userBalanceManager.getByOrderId("ORDER_001")).thenReturn(null);
+            when(userBalanceManager.getByUserIdAndType("user_001", "0"))
+                    .thenReturn(mockCashAccount());
+
+            when(userBalanceManager.updateBalance(
+                    argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 1L),
+                    eq(15000L)
+            )).thenReturn(0);
+
+            assertThatThrownBy(() -> userBalanceService.charge(dto))
+                    .isInstanceOf(BizException.class)
+                    .satisfies(e -> assertThat(
+                            ((BizException) e).getResultCode())
+                            .isEqualTo(ResultCode.OPTIMISTIC_LOCK_CONFLICT));
+
+            verify(userBalanceManager, never()).updateOrderStatus(anyString(), anyString(), any());
+            verify(userBalanceManager, never()).saveFlow(any());
+        }
     }
 
     // ===================== 扣款測試 =====================
@@ -206,7 +243,7 @@ class UserBalanceServiceTest {
 
             userBalanceService.deduct(dto);
 
-            verify(userBalanceManager).updateBalance(1L, 7000L);
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 1L), eq(7000L));
             verify(userBalanceManager).updateOrderStatus("DEDUCT_001", "2", null);
         }
 
@@ -227,8 +264,8 @@ class UserBalanceServiceTest {
             userBalanceService.deduct(dto);
 
             // 贈送金 5000 全部扣完，現金再扣 3000
-            verify(userBalanceManager).updateBalance(2L, 0L);
-            verify(userBalanceManager).updateBalance(1L, 7000L);
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 2L), eq(0L));
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 1L), eq(7000L));
             verify(userBalanceManager, times(2)).saveFlow(any());
         }
 
@@ -298,7 +335,7 @@ class UserBalanceServiceTest {
 
             userBalanceService.refund(dto);
 
-            verify(userBalanceManager).updateBalance(1L, 13000L);
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 1L), eq(13000L));
             verify(userBalanceManager).updateOrderStatus("REFUND_001", "2", null);
             verify(userBalanceManager).updateOrderTradeType("DEDUCT_001", "refund");
         }
@@ -365,7 +402,7 @@ class UserBalanceServiceTest {
 
             userBalanceService.grantGift(dto);
 
-            verify(userBalanceManager).updateBalance(2L, 10000L);
+            verify(userBalanceManager).updateBalance(argThat(po -> po != null && po.getId() != null && po.getId().longValue() == 2L), eq(10000L));
             verify(userBalanceManager).updateOrderStatus("GIFT_001", "2", null);
         }
 

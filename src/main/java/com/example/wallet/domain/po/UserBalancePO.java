@@ -19,6 +19,9 @@ public class UserBalancePO {
 
     private Long balance;
 
+    @Version  // ← 加這行，MyBatis-Plus 樂觀鎖
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 

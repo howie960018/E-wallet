@@ -87,7 +87,10 @@ public class UserBalanceServiceImpl implements UserBalanceService {
 
         long beginBalance = account.getBalance();
         long endBalance = beginBalance + dto.getAmount();
-        userBalanceManager.updateBalance(account.getId(), endBalance);
+        int rows = userBalanceManager.updateBalance(account, endBalance);
+        if (rows == 0) {
+            throw new BizException(ResultCode.OPTIMISTIC_LOCK_CONFLICT);
+        }
         userBalanceManager.updateOrderStatus(dto.getOrderId(), "2", dto.getTradeNo());
 
         UserBalanceFlowPO flow = new UserBalanceFlowPO();
@@ -199,13 +202,20 @@ public class UserBalanceServiceImpl implements UserBalanceService {
         return "ACC" + prefix + accType + random;
     }
 
+
     private void updateBalanceAndWriteFlow(UserBalancePO account,
                                            long delta,
                                            String fundDirect) {
         long beginBalance = account.getBalance();
         long endBalance = beginBalance + delta;
 
-        userBalanceManager.updateBalance(account.getId(), endBalance);
+        // 樂觀鎖更新，updateById 會自動帶 version 條件
+        int rows = userBalanceManager.updateBalance(account, endBalance);
+
+        // rows = 0 代表 version 不符，其他請求已先更新
+        if (rows == 0) {
+            throw new BizException(ResultCode.OPTIMISTIC_LOCK_CONFLICT);
+        }
 
         UserBalanceFlowPO flow = new UserBalanceFlowPO();
         flow.setUserId(account.getUserId());

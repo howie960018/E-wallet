@@ -17,7 +17,8 @@ public enum ResultCode {
     ORDER_NOT_EXIST("B0006", "訂單不存在"),
     ORDER_ALREADY_REFUNDED("B0007", "訂單已退款"),// （退款用）
     GIFT_ACCOUNT_NOT_EXIST("B0008", "贈送金帳戶不存在，請先開戶"),
-    GIFT_CANNOT_CHARGE("B0009", "贈送金帳戶不支援自行充值");
+    GIFT_CANNOT_CHARGE("B0009", "贈送金帳戶不支援自行充值"),
+    OPTIMISTIC_LOCK_CONFLICT("C0002", "操作衝突，請重試");
 
     private final String code;
     private final String message;

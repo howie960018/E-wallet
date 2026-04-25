@@ -59,12 +59,14 @@ public class UserBalanceManager {
     /**
      * 更新餘額（樂觀鎖保護，只更新 balance 欄位）
      */
-    public int updateBalance(Long id, Long newBalance) {
-        return userBalanceMapper.update(null,
-                new LambdaUpdateWrapper<UserBalancePO>()
-                        .eq(UserBalancePO::getId, id)
-                        .set(UserBalancePO::getBalance, newBalance)
-        );
+    /**
+     * 更新餘額（含樂觀鎖版本號）
+     * MyBatis-Plus @Version 會自動在 SQL 加上 WHERE version = #{version}
+     * 並在成功後自動將 version +1
+     */
+    public int updateBalance(UserBalancePO po, Long newBalance) {
+        po.setBalance(newBalance);
+        return userBalanceMapper.updateById(po);
     }
 
     // ===================== user_balance_order =====================
