@@ -4,6 +4,7 @@ package com.example.wallet.service;
 import com.example.wallet.common.result.PageResult;
 import com.example.wallet.domain.bo.AccountBO;
 import com.example.wallet.domain.bo.BalanceFlowBO;
+import com.example.wallet.domain.bo.WalletSummaryBO;
 import com.example.wallet.domain.dto.*;
 
 public interface UserBalanceService {
@@ -37,4 +38,14 @@ public interface UserBalanceService {
      * 查詢流水明細（分頁）
      */
     PageResult<BalanceFlowBO> queryFlow(FlowQueryDTO dto);
+
+    /**
+     * 發放贈送金（後台主動發放）
+     */
+    void grantGift(GiftBalanceGrantDTO dto);
+
+    /**
+     * 查詢錢包總覽（現金 + 贈送金）
+     */
+    WalletSummaryBO queryWalletSummary(String userId);
 }

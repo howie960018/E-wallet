@@ -5,6 +5,7 @@ import com.example.wallet.common.result.PageResult;
 import com.example.wallet.common.result.ResponseResult;
 import com.example.wallet.domain.bo.AccountBO;
 import com.example.wallet.domain.bo.BalanceFlowBO;
+import com.example.wallet.domain.bo.WalletSummaryBO;
 import com.example.wallet.domain.dto.*;
 import com.example.wallet.service.UserBalanceService;
 import lombok.RequiredArgsConstructor;
@@ -96,6 +97,32 @@ public class UserBalanceController {
         log.info("查詢流水請求，userId={}, pageNum={}, pageSize={}",
                 dto.getUserId(), dto.getPageNum(), dto.getPageSize());
         PageResult<BalanceFlowBO> result = userBalanceService.queryFlow(dto);
+        return ResponseResult.success(result);
+    }
+
+
+    /**
+     * 發放贈送金
+     * POST /api/wallet/gift/grant
+     */
+    @PostMapping("/gift/grant")
+    public ResponseResult<Void> grantGift(
+            @RequestBody @Validated GiftBalanceGrantDTO dto) {
+        log.info("發放贈送金請求，userId={}, orderId={}, amount={}",
+                dto.getUserId(), dto.getOrderId(), dto.getAmount());
+        userBalanceService.grantGift(dto);
+        return ResponseResult.success();
+    }
+
+    /**
+     * 查詢錢包總覽
+     * GET /api/wallet/summary?userId=xxx
+     */
+    @GetMapping("/summary")
+    public ResponseResult<WalletSummaryBO> queryWalletSummary(
+            @RequestParam String userId) {
+        log.info("查詢錢包總覽，userId={}", userId);
+        WalletSummaryBO result = userBalanceService.queryWalletSummary(userId);
         return ResponseResult.success(result);
     }
 }

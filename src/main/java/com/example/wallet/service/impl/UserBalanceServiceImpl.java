@@ -7,6 +7,7 @@ import com.example.wallet.common.result.ResultCode;
 import com.example.wallet.domain.bo.AccountBO;
 import com.example.wallet.domain.bo.BalanceFlowBO;
 import com.example.wallet.domain.bo.UserBalanceConvert;
+import com.example.wallet.domain.bo.WalletSummaryBO;
 import com.example.wallet.domain.dto.*;
 import com.example.wallet.domain.po.UserBalanceFlowPO;
 import com.example.wallet.domain.po.UserBalanceOrderPO;
@@ -308,5 +309,79 @@ public class UserBalanceServiceImpl implements UserBalanceService {
 
         return PageResult.of(records, page.getTotal(),
                 dto.getPageNum(), dto.getPageSize());
+    }
+
+
+    // ===================== 贈送金發放 =====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void grantGift(GiftBalanceGrantDTO dto) {
+        // 1. 冪等保護
+        UserBalanceOrderPO existingOrder = userBalanceManager
+                .getByOrderId(dto.getOrderId());
+        if (existingOrder != null) {
+            if ("2".equals(existingOrder.getStatus())) {
+                log.warn("贈送金發放訂單已處理過，orderId={}", dto.getOrderId());
+                return;
+            }
+            throw new BizException(ResultCode.ORDER_EXIST);
+        }
+
+        // 2. 確認贈送金帳戶存在（必須先開戶才能發放）
+        UserBalancePO giftAccount = userBalanceManager
+                .getByUserIdAndType(dto.getUserId(), "1");
+        if (giftAccount == null) {
+            throw new BizException(ResultCode.GIFT_ACCOUNT_NOT_EXIST);
+        }
+
+        // 3. 建立發放訂單
+        UserBalanceOrderPO order = new UserBalanceOrderPO();
+        order.setOrderId(dto.getOrderId());
+        order.setUserId(dto.getUserId());
+        order.setAmount(dto.getAmount());
+        order.setTradeType("gift");
+        order.setStatus("1");
+        order.setIsRenew(0);
+        userBalanceManager.saveOrder(order);
+
+        // 4. 更新贈送金餘額並寫流水
+        updateBalanceAndWriteFlow(giftAccount, dto.getAmount(), "01");
+
+        // 5. 訂單完成
+        userBalanceManager.updateOrderStatus(dto.getOrderId(), "2", null);
+
+        log.info("贈送金發放成功，userId={}, orderId={}, amount={}",
+                dto.getUserId(), dto.getOrderId(), dto.getAmount());
+    }
+
+// ===================== 錢包總覽 =====================
+
+    @Override
+    public WalletSummaryBO queryWalletSummary(String userId) {
+        List<UserBalancePO> accounts = userBalanceManager.listByUserId(userId);
+        if (accounts.isEmpty()) {
+            throw new BizException(ResultCode.ACCOUNT_NOT_EXIST);
+        }
+
+        UserBalancePO cashAccount = accounts.stream()
+                .filter(a -> "0".equals(a.getAccType()))
+                .findFirst().orElse(null);
+        UserBalancePO giftAccount = accounts.stream()
+                .filter(a -> "1".equals(a.getAccType()))
+                .findFirst().orElse(null);
+
+        WalletSummaryBO summary = new WalletSummaryBO();
+        summary.setUserId(userId);
+
+        summary.setCashBalance(cashAccount != null ? cashAccount.getBalance() : 0L);
+        summary.setCashAccNo(cashAccount != null ? cashAccount.getAccNo() : null);
+
+        summary.setGiftBalance(giftAccount != null ? giftAccount.getBalance() : 0L);
+        summary.setGiftAccNo(giftAccount != null ? giftAccount.getAccNo() : null);
+
+        summary.setTotalBalance(summary.getCashBalance() + summary.getGiftBalance());
+
+        return summary;
     }
 }
